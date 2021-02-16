@@ -130,5 +130,9 @@ func run() int {
         log.Println(v)
     }
 
+    if err := Config.Store(*conf); err != nil {
+        log.Fatal(err)
+    }
+
     return 0
 }

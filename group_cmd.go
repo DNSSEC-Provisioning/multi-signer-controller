@@ -44,7 +44,7 @@ func GroupRemoveCmd(args []string, remote bool, output *[]string) error {
         return fmt.Errorf("requires <fqdn>")
     }
 
-    if Config.Exists(fmt.Sprintf("signers:%s", args[0])) {
+    if Config.Exists("signers:" + args[0]) {
         return fmt.Errorf("group %s has signers", args[0])
     }
 

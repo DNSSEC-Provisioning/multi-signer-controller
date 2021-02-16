@@ -45,7 +45,7 @@ func TestUpdateCmd(args []string, remote bool, output *[]string) error {
     *output = append(*output, m.String())
 
     c := new(dns.Client)
-    c.TsigSecret = map[string]string{"update.": secret}
+    c.TsigSecret = map[string]string{tsigkey + ".": secret}
     in, rtt, err := c.Exchange(m, server)
     if err != nil {
         return err
