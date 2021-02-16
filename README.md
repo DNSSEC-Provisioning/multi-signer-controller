@@ -19,3 +19,7 @@ export PATH="$PATH:$GOROOT"
 make
 ./multi-signer-controler
 ```
+
+# Known Issues
+
+- TSIG keys hardcoded to HMAC-SHA256

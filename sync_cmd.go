@@ -2,17 +2,18 @@ package main
 
 import (
     "fmt"
+    "time"
 
     "github.com/miekg/dns"
 )
 
 func init() {
-    Command["status"] = StatusCmd
+    Command["sync-dnskey"] = SyncDnskeyCmd
 
-    CommandHelp["status"] = "Check status of a signer group, requires <fqdn>"
+    CommandHelp["sync-dnskey"] = "Sync DNSKEYs between signers in a group, requires <fqdn>"
 }
 
-func StatusCmd(args []string, remote bool, output *[]string) error {
+func SyncDnskeyCmd(args []string, remote bool, output *[]string) error {
     if len(args) < 1 {
         return fmt.Errorf("requires <fqdn>")
     }
@@ -47,8 +48,6 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
                 continue
             }
 
-            *output = append(*output, fmt.Sprintf("%s: found DNSKEY %d %d %d %s", signer, dnskey.Flags, dnskey.Protocol, dnskey.Algorithm, dnskey.PublicKey))
-
             if _, ok := dnskeys[signer]; !ok {
                 dnskeys[signer] = []*dns.DNSKEY{dnskey}
             } else {
@@ -58,12 +57,32 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
     }
 
     for signer, keys := range dnskeys {
-        *output = append(*output, fmt.Sprintf("Check sync status of %s DNSKEYs", signer))
+        *output = append(*output, fmt.Sprintf("Syncing %s DNSKEYs", signer))
 
         for _, key := range keys {
             if f := key.Flags & 0x101; f == 256 {
+                *output = append(*output, fmt.Sprintf("- %s", key.PublicKey))
+
                 for osigner, okeys := range dnskeys {
                     if osigner == signer {
+                        continue
+                    }
+
+                    tsigkey := Config.Get("signer-tsigkey:"+osigner, "")
+                    if tsigkey == "" {
+                        *output = append(*output, fmt.Sprintf("Missing signer %s TSIG key, can't sync %s keys to it", osigner, signer))
+                        continue
+                    }
+
+                    secret := Config.Get("tsigkey-"+tsigkey, "")
+                    if secret == "" {
+                        *output = append(*output, fmt.Sprintf("Missing TSIG key %s, can't sync %s keys to %s", tsigkey, signer, osigner))
+                        continue
+                    }
+
+                    ip := Config.Get("signer:"+osigner, "")
+                    if ip == "" {
+                        *output = append(*output, fmt.Sprintf("No ip|host for signer %s(???), can't sync it", osigner))
                         continue
                     }
 
@@ -84,7 +103,26 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
                     }
 
                     if !found {
-                        *output = append(*output, fmt.Sprintf("DNSKEY missing in %s: %s", osigner, key.PublicKey))
+                        m := new(dns.Msg)
+                        m.SetUpdate(args[0])
+                        m.Insert([]dns.RR{key})
+                        m.SetTsig(tsigkey+".", dns.HmacSHA256, 300, time.Now().Unix())
+
+                        *output = append(*output, m.String())
+
+                        c := new(dns.Client)
+                        c.TsigSecret = map[string]string{tsigkey + ".": secret}
+                        in, rtt, err := c.Exchange(m, ip)
+                        if err != nil {
+                            return err
+                        }
+
+                        *output = append(*output, fmt.Sprintf("Insert took %v", rtt))
+                        *output = append(*output, in.String())
+
+                        *output = append(*output, fmt.Sprintf("  Added DNSKEY to %s", osigner))
+                    } else {
+                        *output = append(*output, fmt.Sprintf("  Key exist in %s", osigner))
                     }
                 }
             }
