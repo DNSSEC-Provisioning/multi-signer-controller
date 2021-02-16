@@ -23,6 +23,8 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
 
     signers := Config.ListGet(fmt.Sprintf("signers:%s", args[0]))
 
+    dnskeys := make(map[string][]*dns.DNSKEY)
+
     for _, signer := range signers {
         ip := Config.Get(fmt.Sprintf("signer:%s", signer), "")
         if ip == "" {
@@ -33,14 +35,60 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
         m.SetQuestion(args[0], dns.TypeDNSKEY)
 
         c := new(dns.Client)
-        in, rtt, err := c.Exchange(m, ip)
+        r, _, err := c.Exchange(m, ip)
 
         if err != nil {
             return err
         }
 
-        *output = append(*output, fmt.Sprintf("%v", rtt))
-        *output = append(*output, in.String())
+        for _, a := range r.Answer {
+            dnskey, ok := a.(*dns.DNSKEY)
+            if !ok {
+                continue
+            }
+
+            *output = append(*output, fmt.Sprintf("%s: found DNSKEY %d %d %d %s", signer, dnskey.Flags, dnskey.Protocol, dnskey.Algorithm, dnskey.PublicKey))
+
+            if _, ok := dnskeys[signer]; !ok {
+                dnskeys[signer] = []*dns.DNSKEY{dnskey}
+            } else {
+                dnskeys[signer] = append(dnskeys[signer], dnskey)
+            }
+        }
+    }
+
+    for signer, keys := range dnskeys {
+        *output = append(*output, fmt.Sprintf("Check sync status of %s DNSKEYs", signer))
+
+        for _, key := range keys {
+            if f := key.Flags & 0x101; f == 256 {
+                for osigner, okeys := range dnskeys {
+                    if osigner == signer {
+                        continue
+                    }
+
+                    found := false
+                    for _, okey := range okeys {
+                        if f := okey.Flags & 0x101; f == 256 && okey.PublicKey == key.PublicKey {
+                            if okey.Protocol != key.Protocol {
+                                *output = append(*output, fmt.Sprintf("Found DNSKEY in %s but missmatch Protocol: %s", osigner, key.PublicKey))
+                                break
+                            }
+                            if okey.Algorithm != key.Algorithm {
+                                *output = append(*output, fmt.Sprintf("Found DNSKEY in %s but missmatch Protocol: %s", osigner, key.PublicKey))
+                                break
+                            }
+                            found = true
+                            break
+                        }
+                    }
+
+                    if !found {
+                        *output = append(*output, fmt.Sprintf("DNSKEY missing in %s: %s", osigner, key.PublicKey))
+                    }
+                }
+            }
+        }
     }
 
     return nil
