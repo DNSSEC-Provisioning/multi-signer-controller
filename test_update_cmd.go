@@ -3,10 +3,11 @@ package main
 import (
     "encoding/base32"
     "fmt"
-    "github.com/google/uuid"
-    "github.com/miekg/dns"
     "strings"
     "time"
+
+    "github.com/google/uuid"
+    "github.com/miekg/dns"
 )
 
 func init() {
