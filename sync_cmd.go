@@ -42,17 +42,15 @@ func SyncDnskeyCmd(args []string, remote bool, output *[]string) error {
             return err
         }
 
+        dnskeys[signer] = []*dns.DNSKEY{}
+
         for _, a := range r.Answer {
             dnskey, ok := a.(*dns.DNSKEY)
             if !ok {
                 continue
             }
 
-            if _, ok := dnskeys[signer]; !ok {
-                dnskeys[signer] = []*dns.DNSKEY{dnskey}
-            } else {
-                dnskeys[signer] = append(dnskeys[signer], dnskey)
-            }
+            dnskeys[signer] = append(dnskeys[signer], dnskey)
         }
     }
 
