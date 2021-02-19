@@ -15,6 +15,22 @@ This is a list of current things that can be configured with `conf-set`:
 - `signer-tsigkey:<name> <keyname>`: Set which TSIG key <keyname> that signer <name> should use
 - `signer-desec:<name> <tokenname>`: Set which deSEC token <tokenname> that signer <name> should use
 
+# Runtime
+
+*multi-signer-controler* requires `-conf` to be specified at runtime, you can
+see all runtime options by using `-help`.
+
+## Running a daemon
+
+*multi-signer-controler* can be run as a daemon with `daemon` command, once
+started another *multi-signer-controler* can communicate with that daemon
+by using `-remote`.
+
+# Commands
+
+All commands help and required parameters can be view using the `help`
+command (without dash).
+
 # Example: How to run
 
 First we set a short-cut for the base of the command for this example:
