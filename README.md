@@ -39,7 +39,7 @@ First we set a short-cut for the base of the command for this example:
 CMD="./multi-signer-controler -conf example.conf"
 ```
 
-Now we configured the TSIG and deSEC.io secrets we will use in each signer:
+Now we configure the TSIG and deSEC.io secrets we will use for each signer:
 
 ```
 $CMD conf-set tsigkey-tsig asecret==
