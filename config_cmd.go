@@ -6,7 +6,7 @@ import (
 
 func init() {
     Command["conf-list"] = ConfigListCmd
-    CommandHelp["conf-list"] = "List all configure options and their value"
+    CommandHelp["conf-list"] = "List all configured options and their current values"
 
     Command["conf-set"] = ConfigSetCmd
     CommandHelp["conf-set"] = "Set a config option, requires <name> <value>"
