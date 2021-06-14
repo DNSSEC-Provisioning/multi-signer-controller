@@ -1,4 +1,4 @@
-module github.com/DNSSEC-Provisioning/multi-signer-controler
+module github.com/DNSSEC-Provisioning/multi-signer-controller
 
 go 1.15
 
