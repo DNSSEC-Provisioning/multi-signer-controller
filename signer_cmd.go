@@ -9,21 +9,25 @@ func init() {
     Command["signer-list"] = SignerListCmd
     Command["signer-remove"] = SignerRemoveCmd
     Command["signer-tsig"] = SignerTsigCmd
+    Command["signer-mark-leave"] = SignerMarkLeaveCmd
+    Command["signer-unmark-leave"] = SignerUnmarkLeaveCmd
 
-    CommandHelp["signer-add"] = "Add a signer to a group, requires <group> <name> <ip|host> [port]"
+    CommandHelp["signer-add"] = "Add a signer to a group, requires <group> <name> <NS fqdn> <ip|host> [port]"
     CommandHelp["signer-list"] = "List signers in a group, requires <group>"
     CommandHelp["signer-remove"] = "Remove signer from a group, requires <group> <name>"
     CommandHelp["signer-tsig"] = "Set or show which TSIG key to use for dynamic updates, requires <name> [TSIG key]"
+    CommandHelp["signer-mark-leave"] = "Mark a signer that it's leaving the group"
+    CommandHelp["signer-unmark-leave"] = "Unmark a signer that's leaving the group"
 }
 
 func SignerAddCmd(args []string, remote bool, output *[]string) error {
-    if len(args) < 3 {
-        return fmt.Errorf("requires <group> <name> <ip|host> [port]")
+    if len(args) < 4 {
+        return fmt.Errorf("requires <group> <name> <NS fqdn> <ip|host> [port]")
     }
-    if len(args) == 4 {
-        args[2] = args[2] + ":" + args[3]
+    if len(args) == 5 {
+        args[3] = args[3] + ":" + args[4]
     } else {
-        args[2] = args[2] + ":53"
+        args[3] = args[3] + ":53"
     }
 
     if !Config.ListEntryExists("groups", args[0]) {
@@ -34,7 +38,8 @@ func SignerAddCmd(args []string, remote bool, output *[]string) error {
         return fmt.Errorf("signer %s already exists", args[1])
     }
 
-    Config.Set("signer:"+args[1], args[2])
+    Config.Set("signer:"+args[1], args[3])
+    Config.Set("signer-ns:"+args[1], args[2])
     Config.ListAdd("signers:"+args[0], args[1], false)
 
     *output = append(*output, fmt.Sprintf("Signer %s added", args[1]))
@@ -98,6 +103,36 @@ func SignerTsigCmd(args []string, remote bool, output *[]string) error {
             *output = append(*output, fmt.Sprintf("Signer %s is using TSIG key %s for dynamic updates", args[0], key))
         }
     }
+
+    return nil
+}
+
+func SignerMarkLeaveCmd(args []string, remote bool, output *[]string) error {
+    if len(args) < 1 {
+        return fmt.Errorf("requires <name>")
+    }
+
+    if !Config.Exists("signer:" + args[0]) {
+        return fmt.Errorf("signer %s does not exist", args[0])
+    }
+
+    Config.Set("signer-leaving:"+args[0], "yes")
+    *output = append(*output, fmt.Sprintf("Signer %s now marked as leaving", args[0]))
+
+    return nil
+}
+
+func SignerUnmarkLeaveCmd(args []string, remote bool, output *[]string) error {
+    if len(args) < 1 {
+        return fmt.Errorf("requires <name>")
+    }
+
+    if !Config.Exists("signer:" + args[0]) {
+        return fmt.Errorf("signer %s does not exist", args[0])
+    }
+
+    Config.Remove("signer-leaving:" + args[0])
+    *output = append(*output, fmt.Sprintf("Signer %s is no longer marked as leaving", args[0]))
 
     return nil
 }

@@ -9,18 +9,26 @@ func init() {
     Command["group-list"] = GroupListCmd
     Command["group-remove"] = GroupRemoveCmd
 
-    CommandHelp["group-add"] = "Add a new group, requires <fqdn>"
+    CommandHelp["group-add"] = "Add a new group, requires <fqdn> <parent ip|host> [port]"
     CommandHelp["group-list"] = "List groups"
     CommandHelp["group-remove"] = "Remove a group, can not be in use, requires <fqdn>"
 }
 
 func GroupAddCmd(args []string, remote bool, output *[]string) error {
-    if len(args) < 1 {
-        return fmt.Errorf("requires <fqdn>")
+    if len(args) < 2 {
+        return fmt.Errorf("requires <fqdn> <parent ip|host> [port]")
+    }
+
+    if len(args) == 3 {
+        args[1] = args[1] + ":" + args[2]
+    } else {
+        args[1] = args[1] + ":53"
     }
 
     if Config.ListAdd("groups", args[0], false) {
         *output = append(*output, fmt.Sprintf("Group %s added", args[0]))
+
+        Config.Set("parent:"+args[0], args[1])
     } else {
         *output = append(*output, fmt.Sprintf("Group %s already exists", args[0]))
     }
