@@ -1,4 +1,4 @@
-# multi-signer-controler
+# multi-signer-controller
 Control of a DNSSEC multi-signer group
 
 ## Notes
@@ -17,13 +17,13 @@ This is a list of current things that can be configured with `conf-set`:
 
 # Runtime
 
-*multi-signer-controler* requires `-conf` to be specified at runtime, you can
+*multi-signer-controller* requires `-conf` to be specified at runtime, you can
 see all runtime options by using `-help`.
 
 ## Running a daemon
 
-*multi-signer-controler* can be run as a daemon with `daemon` command, once
-started another *multi-signer-controler* can communicate with that daemon
+*multi-signer-controller* can be run as a daemon with `daemon` command, once
+started another *multi-signer-controller* can communicate with that daemon
 by using `-remote`.
 
 # Commands
@@ -36,7 +36,7 @@ command (without dash).
 First we set a short-cut for the base of the command for this example:
 
 ```
-CMD="./multi-signer-controler -conf example.conf"
+CMD="./multi-signer-controller -conf example.conf"
 ```
 
 Now we configure the TSIG and deSEC.io secrets we will use for each signer:
@@ -82,8 +82,8 @@ $CMD sync-dnskey example.com.
 # local go
 
 ```
-mkdir -p go/1.15.8; wget -O - https://storage.googleapis.com/golang/go1.15.8.linux-amd64.tar.gz | tar -C go/1.15.8 -zxv
-export GOROOT="$HOME/go/1.15.8/go" GOPATH="$HOME/go"
+mkdir -p go/1.16.5; wget -O - https://storage.googleapis.com/golang/go1.16.5.linux-amd64.tar.gz | tar -C go/1.16.5 -zxv
+export GOROOT="$HOME/go/1.16.5/go" GOPATH="$HOME/go"
 export PATH="$PATH:$GOROOT"
 ```
 
@@ -91,7 +91,7 @@ export PATH="$PATH:$GOROOT"
 
 ```
 make
-./multi-signer-controler
+./multi-signer-controller
 ```
 
 # Known Issues

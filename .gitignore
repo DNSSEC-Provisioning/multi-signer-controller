@@ -16,5 +16,5 @@ _testmain.go
 *.prof
 go.sum
 go/
-multi-signer-controler
+multi-signer-controller
 *.conf
