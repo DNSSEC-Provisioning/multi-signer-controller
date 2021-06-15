@@ -3,6 +3,7 @@ package main
 import (
     "flag"
     "log"
+    "net/http"
     "net/rpc"
     "os"
     "os/signal"
@@ -15,6 +16,7 @@ var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var memstats = flag.Bool("memstats", false, "output memstats")
 var conf = flag.String("conf", "", "config file to use")
 var remote = flag.String("remote", "", "specify remote daemon to execute commands on [<server|ip>]:<port>")
+var httpAddr = flag.String("http", "", "http service address")
 
 func main() {
     flag.Parse()
@@ -59,6 +61,18 @@ func main() {
     }
 }
 
+func serveHome(w http.ResponseWriter, r *http.Request) {
+    if r.URL.Path != "/" {
+        http.Error(w, "Not found", http.StatusNotFound)
+        return
+    }
+    if r.Method != "GET" {
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+    http.ServeFile(w, r, "home.html")
+}
+
 func run() int {
     args := flag.Args()
 
@@ -73,6 +87,20 @@ func run() int {
         return 0
     }
 
+    if *httpAddr != "" {
+        go func() {
+            http.HandleFunc("/", serveHome)
+            http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+                serveWs(w, r)
+            })
+            log.Println("HTTP on", *httpAddr)
+            err := http.ListenAndServe(*httpAddr, nil)
+            if err != nil {
+                log.Fatal("ListenAndServe: ", err)
+            }
+        }()
+    }
+
     if *remote != "" {
         client, err := rpc.DialHTTP("tcp", *remote)
         if err != nil {
@@ -83,7 +111,7 @@ func run() int {
         var reply []string
         err = client.Call("Rpc.Call", args, &reply)
         if err != nil {
-            log.Fatal("call error:", err)
+            log.Fatal("call error:", err.Error())
         }
 
         for _, v := range reply {
@@ -101,6 +129,7 @@ func run() int {
             log.Fatal(err)
         }
     }
+    DaemonConf = *conf
 
     c := make(chan os.Signal, 1)
     signal.Notify(c, os.Interrupt)

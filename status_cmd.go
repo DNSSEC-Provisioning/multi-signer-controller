@@ -13,6 +13,16 @@ func init() {
 }
 
 func StatusCmd(args []string, remote bool, output *[]string) error {
+    //
+    // This function checks the status of all steps and can be a bit
+    // misleading when reporting missing or needs removal for things
+    // that shouldn't be done. But the relevant states for each automation
+    // stage is correct.
+    //
+    // TODO: could be split into many different functions that only checks
+    //       a specific state
+    //
+
     if len(args) < 1 {
         return fmt.Errorf("requires <fqdn>")
     }
@@ -124,6 +134,10 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
 
     group_dnskeys_synced := true
     for signer, keys := range dnskeys {
+        if Config.Get("signer-leaving:"+signer, "") != "" {
+            *output = append(*output, fmt.Sprintf("Skipping sync status of %s DNSKEYs: leaving signer", signer))
+            continue
+        }
         *output = append(*output, fmt.Sprintf("Check sync status of %s DNSKEYs", signer))
 
         for _, key := range keys {
@@ -149,7 +163,14 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
                         }
                     }
 
-                    if !found {
+                    if found {
+                        // key was found, check if it's owner is leaving
+                        owner := Config.Get("dnskey-origin:"+fmt.Sprintf("%d-%d-%s", key.Protocol, key.Algorithm, key.PublicKey), "")
+                        if owner != "" && Config.Get("signer-leaving:"+owner, "") != "" {
+                            *output = append(*output, fmt.Sprintf("DNSKEY needs removal for %s: %s", osigner, key.PublicKey))
+                            group_dnskeys_synced = false
+                        }
+                    } else {
                         *output = append(*output, fmt.Sprintf("DNSKEY missing in %s: %s", osigner, key.PublicKey))
                         group_dnskeys_synced = false
                     }
@@ -164,7 +185,10 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
     }
 
     ksks := []*dns.DNSKEY{}
-    for _, keys := range dnskeys {
+    for signer, keys := range dnskeys {
+        if Config.Get("signer-leaving:"+signer, "") != "" {
+            continue
+        }
         for _, key := range keys {
             if f := key.Flags & 0x101; f == 257 {
                 ksks = append(ksks, key)
@@ -172,8 +196,12 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
         }
     }
 
-    group_cdcdnskeys_synced := true
+    group_cdscdnskeys_synced := true
     for signer, keys := range cdses {
+        if Config.Get("signer-leaving:"+signer, "") != "" {
+            *output = append(*output, fmt.Sprintf("Skipping sync status of %s CDSes: leaving signer", signer))
+            continue
+        }
         *output = append(*output, fmt.Sprintf("Check sync status of %s CDSes", signer))
 
         for _, ksk := range ksks {
@@ -187,12 +215,16 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
             }
             if !found {
                 *output = append(*output, fmt.Sprintf("CDS missing for KSK: %s", ksk.PublicKey))
-                group_cdcdnskeys_synced = false
+                group_cdscdnskeys_synced = false
             }
         }
     }
 
     for signer, keys := range cdnskeys {
+        if Config.Get("signer-leaving:"+signer, "") != "" {
+            *output = append(*output, fmt.Sprintf("Skipping sync status of %s CDNSKEYs: leaving signer", signer))
+            continue
+        }
         *output = append(*output, fmt.Sprintf("Check sync status of %s CDNSKEYs", signer))
 
         for _, ksk := range ksks {
@@ -206,15 +238,15 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
             }
             if !found {
                 *output = append(*output, fmt.Sprintf("CDNSKEY missing for KSK: %s", ksk.PublicKey))
-                group_cdcdnskeys_synced = false
+                group_cdscdnskeys_synced = false
             }
         }
     }
 
-    if group_cdcdnskeys_synced {
-        Config.Set("group-cdcdnskeys-synced:"+args[0], "yes")
+    if group_cdscdnskeys_synced {
+        Config.Set("group-cdscdnskeys-synced:"+args[0], "yes")
     } else {
-        Config.Remove("group-cdcdnskeys-synced:" + args[0])
+        Config.Remove("group-cdscdnskeys-synced:" + args[0])
     }
 
     group_nses_synced := true
@@ -247,6 +279,18 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
             }
         }
     }
+    *output = append(*output, "Check sync status of NSes for leaving signers")
+    for _, signer := range signers {
+        if Config.Get("signer-leaving:"+signer, "") != "" {
+            leave_ns := Config.Get("signer-ns:"+signer, "")
+            for _, ns := range nsset {
+                if ns.Ns == leave_ns {
+                    *output = append(*output, fmt.Sprintf("  need removal of leaving %s NS: %s", signer, leave_ns))
+                    group_nses_synced = false
+                }
+            }
+        }
+    }
     if group_nses_synced {
         Config.Set("group-nses-synced:"+args[0], "yes")
     } else {
@@ -268,6 +312,7 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
         return err
     }
     dses := []*dns.DS{}
+    removedses := make(map[string]*dns.DS)
     for _, a := range r.Answer {
         ds, ok := a.(*dns.DS)
         if !ok {
@@ -277,13 +322,15 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
         *output = append(*output, fmt.Sprintf("  found DS %d %d %d %s", ds.KeyTag, ds.Algorithm, ds.DigestType, ds.Digest))
 
         dses = append(dses, ds)
+        removedses[fmt.Sprintf("%d %d %d %s", ds.KeyTag, ds.Algorithm, ds.DigestType, ds.Digest)] = ds
     }
 
-    group_parent_ds_synced := group_cdcdnskeys_synced
+    group_parent_ds_synced := group_cdscdnskeys_synced
     cdsmap := make(map[string]*dns.CDS)
     for _, keys := range cdses {
         for _, key := range keys {
             cdsmap[fmt.Sprintf("%d %d %d %s", key.KeyTag, key.Algorithm, key.DigestType, key.Digest)] = key
+            delete(removedses, fmt.Sprintf("%d %d %d %s", key.KeyTag, key.Algorithm, key.DigestType, key.Digest))
         }
     }
     for _, ds := range dses {
@@ -291,6 +338,10 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
     }
     for _, cds := range cdsmap {
         *output = append(*output, fmt.Sprintf("  Missing DS for CDS: %d %d %d %s", cds.KeyTag, cds.Algorithm, cds.DigestType, cds.Digest))
+        group_parent_ds_synced = false
+    }
+    for _, ds := range removedses {
+        *output = append(*output, fmt.Sprintf("  DS needs removal: %d %d %d %s", ds.KeyTag, ds.Algorithm, ds.DigestType, ds.Digest))
         group_parent_ds_synced = false
     }
     if group_parent_ds_synced {
@@ -305,18 +356,29 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
     if err != nil {
         return err
     }
+    group_parent_ns_synced := group_nses_synced
+    leavingns := make(map[string]bool)
+    for _, signer := range signers {
+        if Config.Get("signer-leaving:"+signer, "") != "" {
+            leavingns[Config.Get("signer-ns:"+signer, "")] = true
+        }
+    }
     for _, a := range r.Ns {
         ns, ok := a.(*dns.NS)
         if !ok {
             continue
         }
 
-        *output = append(*output, fmt.Sprintf("  found NS %s", ns.Ns))
+        if _, ok := leavingns[ns.Ns]; ok {
+            *output = append(*output, fmt.Sprintf("  found leaving NS %s, need removal", ns.Ns))
+            group_parent_ns_synced = false
+        } else {
+            *output = append(*output, fmt.Sprintf("  found NS %s", ns.Ns))
+        }
 
         delete(nsmap, ns.Ns)
     }
 
-    group_parent_ns_synced := group_nses_synced
     for ns, _ := range nsmap {
         *output = append(*output, fmt.Sprintf("  Missing NS: %s", ns))
         group_parent_ns_synced = false
