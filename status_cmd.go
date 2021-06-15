@@ -279,7 +279,7 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
         dses = append(dses, ds)
     }
 
-    group_parent_ds_synced := true
+    group_parent_ds_synced := group_cdcdnskeys_synced
     cdsmap := make(map[string]*dns.CDS)
     for _, keys := range cdses {
         for _, key := range keys {
@@ -316,7 +316,7 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
         delete(nsmap, ns.Ns)
     }
 
-    group_parent_ns_synced := true
+    group_parent_ns_synced := group_nses_synced
     for ns, _ := range nsmap {
         *output = append(*output, fmt.Sprintf("  Missing NS: %s", ns))
         group_parent_ns_synced = false
