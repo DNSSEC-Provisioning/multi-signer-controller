@@ -53,6 +53,18 @@ func (c *config) Set(name, value string) {
     c.changed = true
 }
 
+func (c *config) SetIfNotExists(name, value string) bool {
+    c.m.Lock()
+    defer c.m.Unlock()
+
+    if _, ok := c.conf[name]; !ok {
+        c.conf[name] = value
+        c.changed = true
+        return true
+    }
+    return false
+}
+
 func (c *config) Remove(name string) bool {
     c.m.Lock()
     defer c.m.Unlock()

@@ -33,6 +33,8 @@ command (without dash).
 
 # Example: How to run
 
+**TODO** Update run example!
+
 First we set a short-cut for the base of the command for this example:
 
 ```
@@ -97,10 +99,3 @@ make
 # Known Issues
 
 - TSIG keys hardcoded to HMAC-SHA256
-
-# TODO
-
-- signer-add/list/remove without group
-  Right now you add a signer to a group and if you remove it, it's deleted.
-  Once most functionality has been confirmed this can be changed so that
-  signers can be move in and out of signer groups, `group-add-signer` etc.

@@ -57,7 +57,7 @@ func TestUpdateCmd(args []string, remote bool, output *[]string) error {
     m = new(dns.Msg)
     m.SetUpdate(zone)
     m.Remove(rrs)
-    m.SetTsig("update.", dns.HmacSHA256, 300, time.Now().Unix())
+    m.SetTsig(tsigkey+".", dns.HmacSHA256, 300, time.Now().Unix())
 
     *output = append(*output, m.String())
 
