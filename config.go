@@ -4,6 +4,7 @@ import (
     "encoding/json"
     "fmt"
     "io/ioutil"
+    "strings"
     "sync"
 )
 
@@ -80,23 +81,18 @@ func (c *config) Remove(name string) bool {
     return true
 }
 
-// type ConfigChangeFunc func(string) string
-//
-// func (c *config) Change(name, _default string, f ConfigChangeFunc) {
-//     c.m.Lock()
-//     defer c.m.Unlock()
-//
-//     v, ok := c.conf[name]
-//     if !ok {
-//         v = _default
-//     }
-//
-//     v = f(v)
-//
-//     c.conf[name] = value
-//
-//     c.changed = true
-// }
+func (c *config) PrefixKeys(prefix string) []string {
+    c.m.Lock()
+    defer c.m.Unlock()
+
+    keys := []string{}
+    for k, _ := range c.conf {
+        if strings.HasPrefix(k, prefix) {
+            keys = append(keys, k)
+        }
+    }
+    return keys
+}
 
 func (c *config) ListExists(name string) bool {
     c.m.RLock()

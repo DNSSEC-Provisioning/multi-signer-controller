@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous">
+</head>
+<body>
+<main>
+<div class="d-flex flex-row">
+<div class="vh-100 d-flex flex-column flex-shrink-0 p-3 text-white bg-dark" style="width: 280px;">
+    <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
+        <span class="fs-4">Multi-Signer</span>
+    </a>
+    <hr>
+    <ul class="nav nav-pills flex-column mb-auto">
+        <li class="nav-item">
+            <a id="nav-dashboard" href="#" class="nav-link active">Dashboard</a>
+        </li>
+        <li>
+            <a id="nav-console" href="#" class="nav-link text-white">Console</a>
+        </li>
+    </ul>
+    <hr>
+    <span id="conn-status">Connecting...</span>
+</div>
+<div id="dashboard" class="m-2 d-flex flex-column">
+</div>
+<div id="console" class="p-2 d-flex flex-column d-none vh-100">
+    <div class="float-end">
+        <button type="button" class="btn btn-danger">Clear</button>
+        <button type="button" class="btn btn-secondary">Autoscroll: On</button>
+    </div>
+    <small class="mt-2 font-monospace overflow-auto mh-100">
+    </small>
+</div>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+</body>
+<script>
+$(document).ready(function(){
+    var websocketConn, websocketConnect, updateGroup, updateWait;
+    var consoleAutoscroll = true;
+
+    var groups = {};
+    updateGroup = function(fqdn, stage, signers) {
+        var g = groups[fqdn];
+        if (!g) {
+            g = $('<div class="card"><h5 class="card-header"></h5><div class="card-body">Stage: <span></span><br/><div id="wait" class="d-none"></div>Signers: <span></span></div></div>');
+            $('.card-header', g).text(fqdn);
+            g.appendTo('#dashboard');
+            groups[fqdn] = g;
+        }
+
+        $('span:eq(0)', g).text(stage);
+
+        var signer_status = [];
+        for (var idx in signers) {
+            var signer = signers[idx];
+            signer_status.push(signer.name+(signer.leaving ? ' (leaving)' : ''));
+        }
+        signer_status.sort();
+        $('span:eq(1)', g).text(signer_status.join(', '));
+    };
+    updateWait = function(fqdn, wait) {
+        var g = groups[fqdn];
+        if (!g) {
+            return;
+        }
+        if (wait == "done") {
+            $('#wait', g).addClass('d-none');
+        } else {
+            $('#wait', g).removeClass('d-none');
+            $('#wait').text(wait);
+        }
+    };
+
+    websocketConnect = function(){
+        console.log("websocket: Connecting");
+        websocketConn = new WebSocket("ws"+(document.location.protocol=="https:"?"s":"")+"://" + document.location.host + "/ws");
+        websocketConn.onclose = function (evt) {
+            console.log("websocket: Connection closed");
+            $('#conn-status').text('Reconnecting...');
+            window.setTimeout(function(){ websocketConnect(); }, 2000);
+        };
+        websocketConn.onmessage = function (evt) {
+            var messages = evt.data.split('\n');
+            for (var i = 0; i < messages.length; i++) {
+                console.log("msg: "+messages[i]);
+                var m = $.parseJSON(messages[i]);
+
+                if (m.log) {
+                    m.log = m.log.replace("\n", "<br/>");
+                    $('<span></span><br/>').text(m.log).appendTo($('#console small'));
+                    if (consoleAutoscroll) {
+                        $('#console small').scrollTop($('#console small').prop('scrollHeight'));
+                    }
+                } else if (m.left) {
+                    updateWait(m.fqdn, m.left);
+                } else if (m.fqdn) {
+                    updateGroup(m.fqdn, m.stage, m.signers);
+                }
+            }
+        };
+        websocketConn.onopen = function () {
+            console.log("websocket: Connected");
+            $('#conn-status').text('Online');
+        };
+    };
+    websocketConnect();
+
+    $('#nav-dashboard').click(function(event){
+        event.preventDefault();
+        $('#nav-console').removeClass('active').addClass('text-white');
+        $(this).addClass('active').removeClass('text-white');
+        $('#console').addClass('d-none');
+        $('#dashboard').removeClass('d-none');
+    });
+    $('#nav-console').click(function(event){
+        event.preventDefault();
+        $('#nav-dashboard').removeClass('active').addClass('text-white');
+        $(this).addClass('active').removeClass('text-white');
+        $('#dashboard').addClass('d-none');
+        $('#console').removeClass('d-none');
+
+        if (consoleAutoscroll) {
+            $('#console small').scrollTop($('#console small').prop('scrollHeight'));
+        }
+    });
+    $('#console button:eq(0)').click(function(event){
+        event.preventDefault();
+        $('#console small').html('');
+    });
+    $('#console button:eq(1)').click(function(event){
+        event.preventDefault();
+        if (consoleAutoscroll) {
+            consoleAutoscroll = false;
+            $('#console button:eq(1)').text('Autoscroll: Off');
+        } else {
+            consoleAutoscroll = true;
+            $('#console button:eq(1)').text('Autoscroll: On');
+        }
+    });
+});
+</script>
+</html>

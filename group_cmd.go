@@ -29,6 +29,7 @@ func GroupAddCmd(args []string, remote bool, output *[]string) error {
         *output = append(*output, fmt.Sprintf("Group %s added", args[0]))
 
         Config.Set("parent:"+args[0], args[1])
+        Config.Set("automate-stage:"+args[0], AutomateReady)
     } else {
         *output = append(*output, fmt.Sprintf("Group %s already exists", args[0]))
     }
