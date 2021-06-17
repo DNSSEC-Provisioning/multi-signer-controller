@@ -141,7 +141,7 @@ func StatusCmd(args []string, remote bool, output *[]string) error {
         *output = append(*output, fmt.Sprintf("Check sync status of %s DNSKEYs", signer))
 
         for _, key := range keys {
-            if f := key.Flags & 0x101; f == 256 {
+            if f := key.Flags & 0x101; f == 256 { // only process ZSK's
                 for osigner, okeys := range dnskeys {
                     if osigner == signer {
                         continue

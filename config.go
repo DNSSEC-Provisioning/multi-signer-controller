@@ -81,6 +81,7 @@ func (c *config) Remove(name string) bool {
     return true
 }
 
+// Return a list of config keys based on a prefix
 func (c *config) PrefixKeys(prefix string) []string {
     c.m.Lock()
     defer c.m.Unlock()

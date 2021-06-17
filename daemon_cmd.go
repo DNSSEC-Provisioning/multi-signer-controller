@@ -18,6 +18,7 @@ type Rpc struct {
 }
 
 func (r *Rpc) Call(args []string, reply *[]string) error {
+    // lock the daemon so only one command is executed at the same time
     DaemonLock.Lock()
     defer DaemonLock.Unlock()
 
@@ -70,6 +71,7 @@ func DaemonCmd(args []string, remote bool, output *[]string) error {
     }
     log.Println("Listening for RPC on", l.Addr().String())
     AutomateAutostart()
+    // Start listening for gRPC, this won't really return
     http.Serve(l, nil)
 
     return nil

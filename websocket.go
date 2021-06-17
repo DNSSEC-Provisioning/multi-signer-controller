@@ -119,6 +119,7 @@ func (c *Client) readPump() {
             break
         }
         message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+        // received messages are just ignored
         // c.hub.broadcast <- message
     }
 }
