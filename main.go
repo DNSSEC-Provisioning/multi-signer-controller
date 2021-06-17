@@ -129,6 +129,7 @@ func run() int {
             log.Fatal(err)
         }
     }
+    // Daemon needs to know what config is used, it will save changes after each command
     DaemonConf = *conf
 
     c := make(chan os.Signal, 1)

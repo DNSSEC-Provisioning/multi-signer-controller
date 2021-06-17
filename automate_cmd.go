@@ -450,8 +450,8 @@ func AutomateStartCmd(args []string, remote bool, output *[]string) error {
         for !a.Stop {
             time.Sleep(10 * time.Second)
 
+            // Simulate a automate-step command, lock the daemon during
             DaemonLock.Lock()
-
             args := []string{a.Group}
             output := []string{}
             err := AutomateStepCmd(args, false, &output)
@@ -465,7 +465,6 @@ func AutomateStartCmd(args []string, remote bool, output *[]string) error {
                 log.Fatal(cerr)
             }
             DaemonLock.Unlock()
-            // log.Println("Automation step successful for", a.Group)
             for _, o := range output {
                 WsConsole("Automate " + a.Group + ": " + o)
                 log.Println("Automate "+a.Group+":", o)

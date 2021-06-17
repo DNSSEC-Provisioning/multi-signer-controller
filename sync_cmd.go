@@ -62,18 +62,20 @@ func SyncDnskeyCmd(args []string, remote bool, output *[]string) error {
         }
     }
 
+    // for each signer, check every of it's DNSKEY if it needs to be added or removed
     for signer, keys := range dnskeys {
         leaving := Config.Get("signer-leaving:"+signer, "")
         if leaving != "" {
             *output = append(*output, fmt.Sprintf("Signer %s is leaving, removing it's DNSKEYs from others", signer))
             for _, key := range keys {
-                if f := key.Flags & 0x101; f == 256 {
-                    // check that it's our key
+                if f := key.Flags & 0x101; f == 256 { // only process ZSK's
+                    // check if it's our key
                     if Config.Get("dnskey-origin:"+fmt.Sprintf("%d-%d-%s", key.Protocol, key.Algorithm, key.PublicKey), "") != signer {
                         continue
                     }
                     *output = append(*output, fmt.Sprintf("- %s", key.PublicKey))
 
+                    // for every other signer, if we find our key then issue a removal of it
                     for osigner, okeys := range dnskeys {
                         if osigner == signer {
                             continue
@@ -113,7 +115,7 @@ func SyncDnskeyCmd(args []string, remote bool, output *[]string) error {
         *output = append(*output, fmt.Sprintf("Syncing %s DNSKEYs", signer))
 
         for _, key := range keys {
-            if f := key.Flags & 0x101; f == 256 {
+            if f := key.Flags & 0x101; f == 256 { // only process ZSK's
                 *output = append(*output, fmt.Sprintf("- %s", key.PublicKey))
 
                 for osigner, okeys := range dnskeys {
@@ -141,6 +143,7 @@ func SyncDnskeyCmd(args []string, remote bool, output *[]string) error {
                     }
 
                     if !found {
+                        // add a DNSKEY that we had but other signer did not
                         updater := GetUpdater(Config.Get("signer-type:"+osigner, "nsupdate"))
                         if err := updater.Update(args[0], osigner, &[][]dns.RR{[]dns.RR{key}}, nil, output); err != nil {
                             return err
@@ -202,6 +205,7 @@ func SyncCdscdnskeysCmd(args []string, remote bool, output *[]string) error {
         }
     }
 
+    // Create CDS/CDNSKEY records for all DNSKEYs found
     cdses := []dns.RR{}
     cdnskeys := []dns.RR{}
     for _, keys := range dnskeys {
@@ -274,12 +278,14 @@ func SyncNsCmd(args []string, remote bool, output *[]string) error {
         }
     }
 
+    // Map all known NSes
     nsmap := make(map[string]*dns.NS)
     for _, rrs := range nses {
         for _, rr := range rrs {
             nsmap[rr.Ns] = rr
         }
     }
+    // Create two RRsets, one to insert and the other to remove
     nsset := []dns.RR{}
     nsrem := []dns.RR{}
     for _, rr := range nsmap {
